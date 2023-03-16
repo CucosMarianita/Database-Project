@@ -1,0 +1,245 @@
+--11. Formulați în limbaj natural și implementați 5 cereri SQL complexe 
+
+--ordonati alfabetic numele angajatilor si fabrica unde lucreaza, care lucreaza la departamentul 
+--de design si au fost angajati inainte de zz-ll-aaaa
+
+SELECT CONCAT(CONCAT(a.Nume,' ',a.Prenume),' lucreaza la fabrica ',f.Nume,' din orasul ',f.Locatie) as "Rezultat"
+FROM FABRICA f, HALA h, DEPARTAMENT d, ANGAJAT a 
+WHERE f.Id_fabrica=h.Id_fabrica and h.Id_hala=d.Id_hala and d.Id_departament=a.Id_departament
+and UPPER(d.Nume) like UPPER('Design')
+and a.Data_angajare < CAST('01/01/2022' as date)
+ORDER BY a.Nume;
+
+
+--afisati numele complet si mail-ul angajatilor care s-au angajat in ultimele 12 luni si 
+--care au salariul mai mare decat salariul mediu 
+--si care lucreaza intr-un departament ce contine litera "i"
+
+select CONCAT(a.Nume,' ',a.Prenume) as "Angajat", IsNull(a.Mail,'nu exista') as "Mail"
+from ANGAJAT a 
+where a.Salariu > (select avg(Salariu)
+					from angajat)
+		and DATEDIFF(MONTH, a.Data_angajare, CONVERT(DATE, SYSDATETIME()))<12
+		and a.Id_angajat in(select Id_angajat
+							from angajat
+							where Id_departament in (select Id_departament 
+													from departament 
+													where Nume like '%i%'))
+group by a.Nume, a.Prenume, a.Mail;
+
+select avg(a.Salariu) as "Salariu mediu"
+from ANGAJAT a
+
+--pentru fiecare client, sa se afiseze ce suma a avut de plata pe fiecare dintre facturile 
+--cu id-uri cuprinse intre 2 si 6 
+
+select c.Id_client as "ID_client", 
+		sum(iif(f.Id_factura=2, f.Total_plata, null)) as "Factura2",
+		sum(iif(f.Id_factura=3, f.Total_plata, null)) as "Factura3",
+		sum(iif(f.Id_factura=4, f.Total_plata, null)) as "Factura4",
+		sum(iif(f.Id_factura=5, f.Total_plata, null)) as "Factura5",
+		sum(iif(f.Id_factura=6, f.Total_plata, null)) as "Factura6"	
+from CLIENT c inner JOIN FACTURA f 
+ON (c.Id_client = f.Id_client)
+group by c.Id_client, f.Id_factura;
+
+
+SELECT * FROM FACTURA
+select * from client
+
+
+--afisati pentru fiecare material in ce interval se afla cantitatea ramasa pe stoc, iar pentru
+--produsele cu mai putin de 10 bucati, sa se afiseze id-ul furnizorului
+
+select Nume, Categorie, Id_material,
+case 
+	when Cantitate<10 then 'sub 10 bucati'
+	when Cantitate>=10 and Cantitate<50 then 'intre 10 si 50 bucati'
+	when Cantitate>=50 and Cantitate<100 then 'intre 50 si 100 bucati'
+	when Cantitate>=100 and Cantitate<150 then 'intre 100 si 150 bucati'
+	when Cantitate>=150 and Cantitate<200 then 'intre 150 si 200 bucati'
+	else 'peste 200 bucati'
+end as Stoc,
+iif(Cantitate<10, Id_furnizor, null) as Id_furnizor
+from MATERIAL
+order by Cantitate;
+
+
+--afisati produsele standard ce au pretul mai mic decat pretul mediu, folosind with 
+
+WITH temporaryTable(averageValue) as
+    (SELECT avg(Pret)
+    from PRODUS)
+        SELECT Id_produs,Nume, Pret, temporaryTable.averageValue
+        FROM produs, temporaryTable 
+        WHERE produs.Pret < temporaryTable.averageValue;
+
+select * from produs
+
+
+--12. Implementarea a 3 operații de actualizare sau suprimare a datelor utilizând subcereri.
+
+--sa se mareasca cu 10% salariul angajatilor ce lucreaza la departamentul de design, daca
+--daca salariul acestora este mai mic de 6000.
+
+select * from angajat
+
+
+update angajat
+set Salariu = Salariu + 0.1*Salariu
+where Salariu<6000 and Id_departament in (select Id_departament
+									from departament 
+									where Nume like 'design');
+
+select * from angajat
+
+--actualizati cu +10 cantitatea materialelor ce apartin fabricilor din Bucuresti
+
+update material
+set Cantitate = Cantitate + 10
+where Id_fabrica in (select Id_fabrica
+					from fabrica
+					where Locatie='Bucuresti')
+
+select * from material
+
+
+--sa se ieftineasca cu 100 pretul produselor comandate, a caror comanda a fost realizata
+--in luna ianuarie.
+
+update produs_comandat
+set Pret=Pret-100
+where Id_comanda in (select Id_comanda
+					from comanda_produs
+					where month(Data)=01)
+
+
+select * from produs_comandat
+select * from comanda_produs
+
+--13. Crearea unei secvențe ce va fi utilizată în inserarea înregistrărilor în tabele
+
+create sequence seq_angajat
+increment by 5
+start with 20
+maxvalue 1000
+
+--14. Crearea unei vizualizări compuse. Dați un exemplu de operație LMD permisă pe vizualizarea respectivă și un exemplu de operație LMD nepermisă.
+
+--facturi care au pretul mai mare decat media tuturor facturilor
+go
+
+CREATE VIEW view_factura 
+AS 
+SELECT Id_factura, Total_plata
+FROM factura
+WHERE Total_plata > (SELECT AVG(Total_plata) FROM factura);
+
+go
+--select * from view_factura
+
+--Operații permise:
+--Vizualizările pot fi folosite pentru operații DML (Delete, Insert, Update).
+--Operații nepermise:
+--Nu este posibil sa se creeze index-uri pe vizualizări.
+
+
+--15. Crearea unui index care să optimizeze o cerere de tip căutare cu 2 criterii. Specificați cererea.
+
+--curierii al caror nume incepe cu M si numarul de telefon incepe cu 0741
+
+CREATE INDEX curieri_index
+ON CURIER(Id_curier)
+SELECT Id_curier, Nume, Prenume, Telefon
+FROM CURIER
+WHERE Nume like 'M%' and Telefon like '0741%';
+
+
+
+--16. Formulați în limbaj natural și implementați în SQL: o cerere ce utilizează operația outer-join pe minimum 4 tabele și două cereri ce utilizează operația division.
+
+--division
+	--fabrica care comanda doar de la furnizorii al caror nume incepe cu litera "I"
+	--clientii care au comandat numai de la o fabrica din Bucuresti
+
+SELECT *
+FROM fabrica f
+where not exists (
+select Id_furnizor 
+from MATERIAL m
+where f.Id_fabrica = m.Id_fabrica
+except
+(select Id_furnizor 
+from FURNIZOR
+where Nume like 'I%')
+);
+
+SELECT *
+FROM client c
+where not exists (
+select Id_fabrica
+from COMANDA_PRODUS com
+where c.Id_client = com.Id_client
+except
+(select Id_fabrica
+from FABRICA
+where Locatie like 'Bucuresti')
+);
+
+--outer join: afisati pentru fiecare client ce produse ii sunt livrate si carei factura ii apartin
+
+select concat(c.Nume,' ',c.Prenume) as Client, pc.Id_produs_comandat as Produs_livrat, 
+		f.Id_factura as Factura
+from client c right outer join livreaza l on (l.Id_client=c.Id_client)
+left outer join produs_comandat pc on (l.Id_produs_comandat=pc.Id_produs_comandat)
+full outer join factura f on (f.Id_factura=pc.Id_factura)
+order by c.Nume;
+
+select * from client
+select * from produs_comandat
+select * from factura
+select * from livreaza
+
+--ex 17
+
+--Sa se afiseze numele angajatilor, numele si id-ul departamentelor in care lucreaza angajati 
+--care au salariul mai mare de 3000 de lei si au fost 
+--angajati dupa 1 ianuarie 2020.
+
+select d.Id_departament, d.Nume as Nume_dep, concat(a.Nume,' ',a.Prenume) as Nume_angajat
+from departament d
+inner join angajat a
+on (d.Id_departament = a.Id_departament)
+where a.Salariu in (select Salariu
+					from angajat an
+					where an.Salariu >= 3000 
+					and a.Id_departament = an.Id_departament)
+	and Data_angajare in (select Data_angajare
+						from angajat ang
+						where ang.Data_angajare > CAST('01/01/2020' as date) 
+						and a.Id_departament = ang.Id_departament);
+
+
+
+select d.Id_departament, d.Nume as Nume_dep, concat(a.Nume,' ',a.Prenume) as Nume_angajat
+from departament d
+inner join angajat a
+on (d.Id_departament = a.Id_departament)
+where a.Salariu >= 3000 and a.Data_angajare > CAST('01/01/2020' as date) ;
+
+
+select d.Id_departament, d.Nume , concat(a.Nume,' ',a.Prenume) as Nume_angajat
+from (select an.Nume, an.Prenume, Id_departament
+	from angajat an
+	where Salariu >= 3000 
+	and Data_angajare > CAST('01/01/2020' as date)) a
+join(select Nume, Id_departament
+		from departament) d
+on (d.Id_departament = a.Id_departament);
+
+
+
+
+
+
+
